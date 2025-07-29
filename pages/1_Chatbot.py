@@ -9,7 +9,7 @@ st.title("🧠 SerenityMind Chatbot")
 def load_models():
     sentiment_model = pipeline("sentiment-analysis")
     emotion_model = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base")
-    motivator = pipeline("text-generation", model="mrm8488/GPT-2-finetuned-positive-motivational")
+    motivator = pipeline("text-generation", model="mrm8488/GPT-2-finetuned-positive")
     return sentiment_model, emotion_model, motivator
 
 sentiment_model, emotion_model, motivator = load_models()
