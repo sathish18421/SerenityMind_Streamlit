@@ -3,13 +3,12 @@ from transformers import pipeline
 from streamlit_chat import message
 
 st.set_page_config(page_title="Chatbot - SerenityMind")
-
 st.title("🧠 SerenityMind Chatbot")
 
 @st.cache_resource
 def load_models():
     sentiment_model = pipeline("sentiment-analysis")
-    emotion_model = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base", return_all_scores=False)
+    emotion_model = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base")
     motivator = pipeline("text-generation", model="mrm8488/GPT-2-finetuned-positive-motivational")
     return sentiment_model, emotion_model, motivator
 
