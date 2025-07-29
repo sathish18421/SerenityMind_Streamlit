@@ -10,9 +10,14 @@ st.set_page_config(page_title="🧠 SerenityMind Chatbot", layout="centered")
 
 # Preprocess user input
 def clean_text(text):
-    text = text.strip()
-    text = re.sub(r"iam", "I am", text, flags=re.IGNORECASE)
+    text = text.strip().lower()
+    text = re.sub(r"\bi[ ]*am\b", "I am", text)
+    text = text.replace("im ", "I am ")
+    text = text.replace("depressed", "sad")
+    text = text.replace("in depression", "feeling very sad")
+    text = text.replace("low mood", "feeling down")
     return text
+
 
 # Custom background using base64 webp
 @st.cache_resource
