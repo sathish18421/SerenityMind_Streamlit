@@ -7,12 +7,11 @@ import re
 from textblob import TextBlob
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
-from langchain.llms import HuggingFaceHub
+from langchain_community.llms import HuggingFaceEndpoint
 
 # ------------------ Streamlit Setup ------------------
 st.set_page_config(page_title="🧠 SerenityMind Chatbot", layout="centered")
 
-# Background Setup
 @st.cache_resource
 def get_base64_bg(file_path):
     with open(file_path, "rb") as f:
@@ -51,8 +50,12 @@ def query_huggingface_api(prompt, url):
     except:
         return None
 
-# ------------------ LangChain Setup ------------------
-llm = HuggingFaceHub(repo_id="OpenAssistant/oasst-sft-1-pythia-12b", huggingfacehub_api_token=API_TOKEN)
+# ------------------ LangChain GenAI Setup ------------------
+llm = HuggingFaceEndpoint(
+    repo_id="HuggingFaceH4/zephyr-7b-alpha",
+    huggingfacehub_api_token=API_TOKEN,
+    task="text-generation"
+)
 memory = ConversationBufferMemory()
 chain = ConversationChain(llm=llm, memory=memory)
 
@@ -83,7 +86,7 @@ user_input = clean_text(raw_input)
 
 if user_input:
     st.session_state.chat_history.append(("user", raw_input))
-    with st.spinner("Analyzing your mood..."):
+    with st.spinner("Analyzing your message and context..."):
         blob = TextBlob(user_input)
         polarity = blob.sentiment.polarity
         subjectivity = blob.sentiment.subjectivity
@@ -97,7 +100,13 @@ if user_input:
         intensity_score = float(intensity_res[0]["score"]) if intensity_res else abs(polarity)
         scaled_intensity = round(intensity_score * 10, 1)
 
-        context_prompt = f"The user feels {emotion_label}, sentiment is {sentiment_label}, intensity {scaled_intensity}/10.\nTextBlob: polarity={polarity:.2f}, subjectivity={subjectivity:.2f}.\nUser: {user_input}"
+        context_prompt = f"""
+        The user feels {emotion_label}, sentiment is {sentiment_label}, intensity {scaled_intensity}/10.
+        TextBlob: polarity={polarity:.2f}, subjectivity={subjectivity:.2f}.
+        The user said: '{user_input}'
+
+        Respond like a supportive therapist. Give an empathetic and motivational reply, and suggest a helpful action (e.g., deep breathing, journaling, reaching out to a friend).
+        """
         reply_text = chain.run(context_prompt)
 
         reply = f"""
