@@ -50,6 +50,7 @@ def query_huggingface_api(prompt, mode):
     endpoints = {
         "sentiment": "https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english",
         "emotion": "https://api-inference.huggingface.co/models/j-hartmann/emotion-english-distilroberta-base",
+        "intensity": "https://api-inference.huggingface.co/models/finiteautomata/bertweet-base-emotion-intensity",
         "motivator": "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct"
     }
     url = endpoints.get(mode)
@@ -85,19 +86,16 @@ if user_input:
     with st.spinner("Analyzing your mood..."):
         sentiment = query_huggingface_api(user_input, "sentiment")
         emotion = query_huggingface_api(user_input, "emotion")
-
-        st.write("Sentiment Raw:", sentiment)
-        st.write("Emotion Raw:", emotion)
+        intensity = query_huggingface_api(user_input, "intensity")
 
         # fallback if result is empty or bad
-        if not emotion or not isinstance(emotion, list) or "label" not in emotion[0]:
-            emotion = [{"label": "sadness"}]
-        if not sentiment or not isinstance(sentiment, list) or "label" not in sentiment[0]:
-            sentiment = [{"label": "negative"}]
+        mood = emotion[0]['label'] if emotion and isinstance(emotion, list) and 'label' in emotion[0] else "sadness"
+        senti = sentiment[0]['label'] if sentiment and isinstance(sentiment, list) and 'label' in sentiment[0] else "negative"
+        intensity_score = intensity[0]['score'] if intensity and isinstance(intensity, list) and 'score' in intensity[0] else 0.5
 
-        mood = emotion[0].get("label", "neutral")
-        senti = sentiment[0].get("label", "neutral")
-        prompt = f"You are a compassionate AI mental health therapist. The user feels {mood.lower()} and their sentiment is {senti.lower()}. User says: '{user_input}'. Respond with empathy, suggest a helpful mental health technique like box breathing, gratitude journaling, or grounding. Be friendly and brief."
+        scaled_intensity = round(intensity_score * 10, 1)
+
+        prompt = f"You are a compassionate AI mental health therapist. The user feels {mood.lower()} with an emotional intensity of {scaled_intensity}/10 and their sentiment is {senti.lower()}. User says: '{user_input}'. Respond with empathy, suggest a helpful mental health technique like box breathing, gratitude journaling, or grounding. Be friendly and brief."
         motivational = query_huggingface_api(prompt, "motivator")
 
         response_text = motivational[0]['generated_text'].strip() if motivational and isinstance(motivational, list) else "Let's take a deep breath and move forward together."
@@ -105,7 +103,7 @@ if user_input:
         reply = f"""
 **🧠 Emotional Insight**
 
-You're feeling **{mood.lower()}** and your sentiment is **{senti.lower()}**.
+You're feeling **{mood.lower()}** with an emotional intensity of **{scaled_intensity}/10** and your sentiment is **{senti.lower()}**.
 
 💬 **My Suggestion**
 
