@@ -9,3 +9,4 @@ torch
 streamlit-lottie
 requests
 python-dotenv
+textblob
