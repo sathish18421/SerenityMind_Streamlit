@@ -1,31 +1,18 @@
 import streamlit as st
 import requests
 from streamlit_chat import message
-from PIL import Image
+from uuid import uuid4
 import base64
 import re
 
-# Set app config
+# Page config
 st.set_page_config(page_title="🧠 SerenityMind Chatbot", layout="centered")
 
-# Preprocess user input
-def clean_text(text):
-    if not text:
-        return ""
-    text = text.strip().lower()
-    text = re.sub(r"\bi[ ]*am\b", "I am", text)
-    text = text.replace("im ", "I am ")
-    text = text.replace("depressed", "sad")
-    text = text.replace("in depression", "feeling very sad")
-    text = text.replace("low mood", "feeling down")
-    return text
-
-# Custom background using base64 webp
+# Background Setup
 @st.cache_resource
 def get_base64_bg(file_path):
     with open(file_path, "rb") as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
+        return base64.b64encode(f.read()).decode()
 
 def set_background(image_path):
     encoded = get_base64_bg(image_path)
@@ -46,18 +33,24 @@ set_background("assets/background.webp")
 API_TOKEN = "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"
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
-# Helper function for Hugging Face APIs
-@st.cache_data(show_spinner=False)
-def query_huggingface_api(prompt, url):
-    response = requests.post(url, headers=headers, json={"inputs": prompt})
-    if response.status_code == 200:
-        try:
-            return response.json()
-        except:
-            return None
-    return None
+# Preprocessing
+def clean_text(text):
+    text = text.strip().lower()
+    text = re.sub(r"\bi[ ]*am\b", "I am", text)
+    text = text.replace("im ", "I am ")
+    text = text.replace("depressed", "very sad")
+    text = text.replace("in depression", "feeling deeply low")
+    return text
 
-# Model endpoints
+# Hugging Face API query
+def query_huggingface_api(prompt, url):
+    try:
+        res = requests.post(url, headers=headers, json={"inputs": prompt}, timeout=15)
+        return res.json() if res.status_code == 200 else None
+    except:
+        return None
+
+# Models
 ENDPOINTS = {
     "sentiment": "https://api-inference.huggingface.co/models/nlptown/bert-base-multilingual-uncased-sentiment",
     "emotion": "https://api-inference.huggingface.co/models/SamLowe/roberta-base-go_emotions",
@@ -65,11 +58,11 @@ ENDPOINTS = {
     "motivator": "https://api-inference.huggingface.co/models/OpenAssistant/oasst-sft-1-pythia-12b"
 }
 
-# Initialize chat history
+# Session history
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# Chatbot header
+# Header
 st.markdown("""
 <div style="display: flex; align-items: center; justify-content: space-between; background-color: #ffffffcc; padding: 0.8rem 1rem; border-radius: 1rem;">
     <div style="display: flex; align-items: center;">
@@ -79,53 +72,48 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# User input
+# Input
 raw_input = st.text_input("How are you feeling today?")
 user_input = clean_text(raw_input)
 
 if user_input:
     st.session_state.chat_history.append(("user", raw_input))
-
-    with st.spinner("Analyzing your mood..."):
+    with st.spinner("Analyzing..."):
+        # Sentiment
         sentiment_res = query_huggingface_api(user_input, ENDPOINTS["sentiment"])
+        sentiment_label = sentiment_res[0]["label"] if sentiment_res else "neutral"
+
+        # Emotion
         emotion_res = query_huggingface_api(user_input, ENDPOINTS["emotion"])
+        emotion_label = emotion_res[0]["label"] if emotion_res else "unidentified emotion"
+
+        # Intensity
         intensity_res = query_huggingface_api(user_input, ENDPOINTS["intensity"])
-
-        # Safely extract data
-        try:
-            senti_label = sentiment_res[0]['label'] if sentiment_res else "neutral"
-            emotion_label = emotion_res[0]['label'] if emotion_res else "neutral"
-            intensity_score = float(intensity_res[0]['score']) if intensity_res else 0.5
-        except Exception:
-            senti_label = "neutral"
-            emotion_label = "neutral"
-            intensity_score = 0.5
-
+        intensity_score = float(intensity_res[0]["score"]) if intensity_res else 0.5
         scaled_intensity = round(intensity_score * 10, 1)
 
+        # Prompt for motivation
         prompt = f"""
-        You are a compassionate mental health AI. The user is feeling {emotion_label.lower()} with an emotional intensity of {scaled_intensity}/10 and sentiment is {senti_label.lower()}. They said: '{user_input}'.
-        Reply empathetically. Suggest one mental wellness tip like gratitude journaling, box breathing, or 5-4-3-2-1 grounding. Keep it short and warm.
+        You are a caring AI therapist. The user is feeling {emotion_label} with sentiment {sentiment_label} at {scaled_intensity}/10 intensity. They said: '{user_input}'.
+        Respond with empathy. Then suggest a simple, research-backed mental health technique (e.g. gratitude, box breathing, 54321 method).
+        Be kind, short, and warm.
         """
-        motivational_res = query_huggingface_api(prompt, ENDPOINTS["motivator"])
-        if motivational_res and isinstance(motivational_res, list):
-            response_text = motivational_res[0]['generated_text'].strip()
-        else:
-            response_text = "You are not alone. Let's try a grounding technique together."
+        motivator_res = query_huggingface_api(prompt, ENDPOINTS["motivator"])
+        generated = motivator_res[0]["generated_text"].strip() if motivator_res and isinstance(motivator_res, list) else "You're not alone. Let's try a mindful breathing exercise together."
 
         reply = f"""
 **🧠 Emotional Insight**
 
-You're feeling **{emotion_label.lower()}** with an emotional intensity of **{scaled_intensity}/10** and your sentiment is **{senti_label.lower()}**.
+You're feeling **{emotion_label}**, sentiment is **{sentiment_label}**, and intensity is **{scaled_intensity}/10**.
 
 💬 **My Suggestion**
 
-_"{response_text}"_
+_"{generated}"_
 
-🔎 Tip: Try **box breathing** – inhale 4s, hold 4s, exhale 4s, hold 4s. Used by therapists and elite performers!
+🔎 *Tip:* Try **54321 grounding** – Name 5 things you see, 4 you feel, 3 you hear, 2 you smell, 1 you taste.
 """
         st.session_state.chat_history.append(("bot", reply))
 
-# Chat UI
-for i, (sender, msg) in enumerate(reversed(st.session_state.chat_history)):
-    message(msg, is_user=(sender == "user"), key=f"{sender}_{i}")
+# Display
+for sender, msg in reversed(st.session_state.chat_history):
+    message(msg, is_user=(sender == "user"), key=f"{sender}_{uuid4()}")
