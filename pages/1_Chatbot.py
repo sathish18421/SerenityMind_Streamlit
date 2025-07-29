@@ -33,7 +33,7 @@ def set_background(image_path):
 set_background("assets/background.webp")
 
 # ------------------ Hugging Face Setup ------------------
-API_TOKEN = "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"
+API_TOKEN = "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"
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
 ENDPOINTS = {
