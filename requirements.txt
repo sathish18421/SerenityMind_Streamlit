@@ -1,0 +1,7 @@
+streamlit
+transformers
+streamlit-chat
+gtts
+matplotlib
+pandas
+streamlit-option-menu
