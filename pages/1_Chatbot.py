@@ -29,35 +29,32 @@ def set_background(image_path):
 
 set_background("assets/background.webp")
 
-# Hugging Face token
+# Token setup
 API_TOKEN = "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"
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
-# Query helper
+# Helper function for Hugging Face APIs
 @st.cache_data(show_spinner=False)
 def query_huggingface_api(prompt, mode):
     endpoints = {
         "sentiment": "https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english",
         "emotion": "https://api-inference.huggingface.co/models/j-hartmann/emotion-english-distilroberta-base",
-        "motivator": "https://api-inference.huggingface.co/models/gpt2"
+        "motivator": "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct"
     }
     url = endpoints.get(mode)
     if not url:
         return None
 
-    try:
-        response = requests.post(url, headers=headers, json={"inputs": prompt}, timeout=30)
-        if response.status_code == 200:
-            return response.json()
-    except Exception as e:
-        print(f"[ERROR] {mode} API: {e}")
+    response = requests.post(url, headers=headers, json={"inputs": prompt})
+    if response.status_code == 200:
+        return response.json()
     return None
 
-# Initialize chat
+# Initialize chat history
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# Chat header
+# Chatbot header
 st.markdown("""
 <div style="display: flex; align-items: center; justify-content: space-between; background-color: #ffffffcc; padding: 0.8rem 1rem; border-radius: 1rem;">
     <div style="display: flex; align-items: center;">
@@ -67,7 +64,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Input
+# User input
 user_input = st.text_input("How are you feeling today?")
 
 if user_input:
@@ -77,17 +74,13 @@ if user_input:
         sentiment = query_huggingface_api(user_input, "sentiment")
         emotion = query_huggingface_api(user_input, "emotion")
 
-        if sentiment and emotion and isinstance(sentiment, list) and isinstance(emotion, list):
+        if isinstance(sentiment, list) and sentiment and isinstance(emotion, list) and emotion:
             mood = emotion[0].get("label", "neutral")
             senti = sentiment[0].get("label", "neutral")
-
-            prompt = f"You feel {mood}. Remember,"
+            prompt = f"You are a compassionate AI mental health therapist. The user feels {mood.lower()} and their sentiment is {senti.lower()}. User says: '{user_input}'. Respond with empathy, suggest a helpful mental health technique like box breathing, gratitude journaling, or grounding. Be friendly and brief."
             motivational = query_huggingface_api(prompt, "motivator")
 
-            if motivational and isinstance(motivational, list) and "generated_text" in motivational[0]:
-                generated = motivational[0]["generated_text"].strip()
-            else:
-                generated = "You are stronger than you think. Take a deep breath and face the moment with courage."
+            response_text = motivational[0]['generated_text'].strip() if motivational and isinstance(motivational, list) else "Let's take a deep breath and move forward together."
 
             reply = f"""
 **🧠 Emotional Insight**
@@ -96,15 +89,15 @@ You're feeling **{mood.lower()}** and your sentiment is **{senti.lower()}**.
 
 💬 **My Suggestion**
 
-_"{generated}"_
+_"{response_text}"_
 
-🧘 Mental health tip: Try **Box Breathing** — inhale 4s, hold 4s, exhale 4s, hold 4s. It's a calming technique backed by neuroscience.
+🔎 Try this tip: **Box breathing** – inhale 4s, hold 4s, exhale 4s, hold 4s. A quick calm-down technique backed by neuroscience!
 """
         else:
-            reply = "😕 Sorry, I couldn't understand your mood. Please try again with more detail or different words."
+            reply = "Sorry, I couldn't understand your mood. Please try again."
 
         st.session_state.chat_history.append(("bot", reply))
 
-# Display messages (corrected key generation)
-for idx, (sender, msg) in enumerate(st.session_state.chat_history):
-    message(msg, is_user=(sender == "user"), key=f"{sender}_{idx}")
+# Chat UI
+for i, (sender, msg) in enumerate(reversed(st.session_state.chat_history)):
+    message(msg, is_user=(sender == "user"), key=f"{sender}_{i}_{hash(msg)}")
