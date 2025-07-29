@@ -1,1 +1,10 @@
+from transformers import pipeline
 
+def load_emotion_model():
+    return pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base")
+
+def load_sentiment_model():
+    return pipeline("sentiment-analysis")
+
+def load_motivational_model():
+    return pipeline("text-generation", model="mrm8488/GPT-2-finetuned-positive-motivational")
