@@ -97,5 +97,6 @@ _"{motivational[0]['generated_text']}"_
         st.session_state.chat_history.append(("bot", reply))
 
 # Chat UI
-for sender, msg in reversed(st.session_state.chat_history):
-    message(msg, is_user=(sender == "user"), key=f"{sender}_{hash(msg)}")
+for i, (sender, msg) in enumerate(reversed(st.session_state.chat_history)):
+    message(msg, is_user=(sender == "user"), key=f"{sender}_{i}")
+
