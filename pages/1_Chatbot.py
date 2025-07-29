@@ -1,38 +1,12 @@
 import streamlit as st
-from transformers import pipeline
-from streamlit_chat import message
+from utils.inference_api import query_huggingface_api
+from streamlit_lottie import st_lottie
 import random
 
-st.set_page_config(page_title="SerenityMind Chatbot", page_icon="🧠", layout="wide")
-st.markdown("""
-    <style>
-        body {
-            background-color: #fdfdfd;
-            color: #333333;
-        }
-        .stTextInput > div > div > input {
-            background-color: #ffffff;
-            color: #000000;
-        }
-        .message-bubble {
-            border-radius: 20px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
-    </style>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="SerenityMind - AI Therapist", page_icon="🧠")
 
-st.title("🤖 SerenityMind Chatbot")
-st.markdown("<sub>Status: <span style='color:green;'>Online</span></sub>", unsafe_allow_html=True)
-
-@st.cache_resource
-def load_models():
-    sentiment_model = pipeline("sentiment-analysis")
-    emotion_model = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base")
-    motivator = pipeline("text-generation", model="tiiuae/falcon-7b-instruct", trust_remote_code=True)
-    return sentiment_model, emotion_model, motivator
-
-sentiment_model, emotion_model, motivator = load_models()
+st.markdown("## 🤖 SerenityMind Chatbot")
+st.caption("Your mental health companion, always here to talk.")
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -40,33 +14,51 @@ if "chat_history" not in st.session_state:
 if "mood_score" not in st.session_state:
     st.session_state.mood_score = None
 
-user_input = st.text_input("💬 How are you feeling today?", key="input")
+st.write("### 🧘 How are you feeling today?")
+user_input = st.text_input("Type your thoughts here...")
 
 if user_input:
-    with st.spinner("Analyzing your emotional tone..."):
-        sentiment = sentiment_model(user_input)[0]["label"]
-        emotion = emotion_model(user_input)[0]["label"]
-
-        if st.session_state.mood_score is None:
-            st.markdown("### 🌡️ How would you rate your mood on a scale from 1️⃣ to 🔟?")
-            mood_score = st.slider("Mood Score", 1, 10, 5)
-            st.session_state.mood_score = mood_score
-
-        prompt = f"You are a compassionate AI therapist. A user says: '{user_input}'. They feel {emotion.lower()} and their sentiment is {sentiment.lower()}, with a mood score of {st.session_state.mood_score}/10. Provide an empathetic response and suggest a psychological technique like gratitude listing or breathing with a real scientific reason."
-        motivational_text = motivator(prompt, max_new_tokens=100)[0]["generated_text"]
-
     st.session_state.chat_history.append(("user", user_input))
-    reply = f"""
-### 🧠 Emotional Insight
-You're feeling **{emotion.lower()}** and your sentiment is **{sentiment.lower()}**.
+    with st.spinner("Analyzing your mood..."):
+        sentiment = query_huggingface_api(user_input, "sentiment")
+        emotion = query_huggingface_api(user_input, "emotion")
+        motivational = query_huggingface_api(f"You feel {emotion[0]['label'].lower()}. Remember,", "motivator")
 
-### 💬 My Suggestion
-{motivational_text.strip()}
-    """
+    mood = emotion[0]['label']
+    senti = sentiment[0]['label']
+    suggestion = {
+        "sadness": "Try gratitude journaling. Listing 3 good things daily boosts happiness.",
+        "joy": "Embrace it! Share your joy with someone – happiness grows when shared.",
+        "anger": "Take deep breaths. Grounding yourself can lower cortisol.",
+        "fear": "Try the 5-4-3-2-1 technique to return to the present moment.",
+        "confusion": "Clarity comes with calm. Try box breathing (inhale 4s, hold 4s, exhale 4s)."
+    }.get(mood.lower(), "Talking about it helps. Journaling could be a good step.")
+
+    # Mood score UI
+    st.write("#### 🌡️ How intense is this feeling? (1-10)")
+    mood_score = st.slider("Rate your current mood", 1, 10, 5)
+    st.session_state.mood_score = mood_score
+
+    # Chatbot reply
+    reply = f"""
+**Emotional Insight**
+
+You're feeling **{mood.lower()}** and your sentiment is **{senti.lower()}**.
+Mood intensity: **{mood_score}/10**
+
+💬 **My Suggestion**  
+{suggestion}
+
+💡 _Here's something uplifting:_  
+> {motivational[0]['generated_text'].strip()}
+"""
     st.session_state.chat_history.append(("bot", reply))
 
-st.markdown("---")
-st.subheader("💭 Your Conversation")
-
+# Show past chats
 for sender, msg in reversed(st.session_state.chat_history):
-    message(msg, is_user=(sender == "user"), key=f"{sender}_{hash(msg)}")
+    with st.chat_message("user" if sender == "user" else "assistant"):
+        st.markdown(msg)
+
+st.markdown("---")
+st.markdown("Need to relax? Here's a quick **breathing animation**:")
+st.image("assets/breathing.gif", use_column_width=True)
