@@ -5,3 +5,4 @@ gtts
 matplotlib
 pandas
 streamlit-option-menu
+torch
