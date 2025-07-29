@@ -1,7 +1,4 @@
-streamlit==1.33.0
+streamlit
 streamlit-chat
+google-generativeai
 textblob
-langchain
-langchain-community
-huggingface_hub
-requests
