@@ -29,11 +29,11 @@ def set_background(image_path):
 
 set_background("assets/background.webp")
 
-# Token setup
+# Hugging Face token
 API_TOKEN = "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"
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
-# Helper function for Hugging Face APIs
+# Query helper
 @st.cache_data(show_spinner=False)
 def query_huggingface_api(prompt, mode):
     endpoints = {
@@ -45,16 +45,19 @@ def query_huggingface_api(prompt, mode):
     if not url:
         return None
 
-    response = requests.post(url, headers=headers, json={"inputs": prompt})
-    if response.status_code == 200:
-        return response.json()
+    try:
+        response = requests.post(url, headers=headers, json={"inputs": prompt}, timeout=30)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        print(f"[ERROR] {mode} API: {e}")
     return None
 
-# Initialize chat history
+# Initialize chat
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# Chatbot header
+# Chat header
 st.markdown("""
 <div style="display: flex; align-items: center; justify-content: space-between; background-color: #ffffffcc; padding: 0.8rem 1rem; border-radius: 1rem;">
     <div style="display: flex; align-items: center;">
@@ -64,7 +67,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# User input
+# Input
 user_input = st.text_input("How are you feeling today?")
 
 if user_input:
@@ -74,11 +77,17 @@ if user_input:
         sentiment = query_huggingface_api(user_input, "sentiment")
         emotion = query_huggingface_api(user_input, "emotion")
 
-        if isinstance(sentiment, list) and sentiment and isinstance(emotion, list) and emotion:
+        if sentiment and emotion and isinstance(sentiment, list) and isinstance(emotion, list):
             mood = emotion[0].get("label", "neutral")
             senti = sentiment[0].get("label", "neutral")
+
             prompt = f"You feel {mood}. Remember,"
             motivational = query_huggingface_api(prompt, "motivator")
+
+            if motivational and isinstance(motivational, list) and "generated_text" in motivational[0]:
+                generated = motivational[0]["generated_text"].strip()
+            else:
+                generated = "You are stronger than you think. Take a deep breath and face the moment with courage."
 
             reply = f"""
 **🧠 Emotional Insight**
@@ -87,18 +96,15 @@ You're feeling **{mood.lower()}** and your sentiment is **{senti.lower()}**.
 
 💬 **My Suggestion**
 
-_"{motivational[0]['generated_text']}"_
+_"{generated}"_
 
-🔎 Try a mental health tip: **Box breathing** – inhale 4s, hold 4s, exhale 4s, hold 4s. Helps reduce anxiety quickly!
+🧘 Mental health tip: Try **Box Breathing** — inhale 4s, hold 4s, exhale 4s, hold 4s. It's a calming technique backed by neuroscience.
 """
         else:
-            reply = "Sorry, I couldn't understand your mood. Please try again."
+            reply = "😕 Sorry, I couldn't understand your mood. Please try again with more detail or different words."
 
         st.session_state.chat_history.append(("bot", reply))
 
-# Chat UI
+# Display messages (corrected key generation)
 for idx, (sender, msg) in enumerate(st.session_state.chat_history):
     message(msg, is_user=(sender == "user"), key=f"{sender}_{idx}")
-
-# Push chat to scroll bottom
-st.markdown("<div style='height: 80px;'></div>", unsafe_allow_html=True)
