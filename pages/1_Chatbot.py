@@ -3,93 +3,70 @@ from transformers import pipeline
 from streamlit_chat import message
 import random
 
-# -------------------- Page Setup --------------------
-st.set_page_config(page_title="SerenityMind Chatbot", page_icon="🧠", layout="centered")
+st.set_page_config(page_title="SerenityMind Chatbot", page_icon="🧠", layout="wide")
 st.markdown("""
     <style>
-    .st-emotion-cache-1v0mbdj {visibility: hidden;} /* Hide default footer */
-    .message-bubble {
-        background-color: #e8f0fe;
-        padding: 1em;
-        border-radius: 12px;
-        margin-bottom: 0.5em;
-    }
+        body {
+            background-color: #fdfdfd;
+            color: #333333;
+        }
+        .stTextInput > div > div > input {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        .message-bubble {
+            border-radius: 20px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("## 🤖 SerenityMind Chatbot")
-st.markdown("<span style='color:green;'>🟢 Online</span> &nbsp; | &nbsp; *Your personal AI mental health companion*", unsafe_allow_html=True)
-st.write("___")
+st.title("🤖 SerenityMind Chatbot")
+st.markdown("<sub>Status: <span style='color:green;'>Online</span></sub>", unsafe_allow_html=True)
 
-# -------------------- Model Loading --------------------
 @st.cache_resource
 def load_models():
     sentiment_model = pipeline("sentiment-analysis")
     emotion_model = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base")
-    motivator = pipeline("text-generation", model="gpt2")
+    motivator = pipeline("text-generation", model="tiiuae/falcon-7b-instruct", trust_remote_code=True)
     return sentiment_model, emotion_model, motivator
 
 sentiment_model, emotion_model, motivator = load_models()
 
-# -------------------- Session State --------------------
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 if "mood_score" not in st.session_state:
     st.session_state.mood_score = None
 
-# -------------------- Mood Selection --------------------
-with st.sidebar:
-    st.header("🌈 Mood Check-In")
-    mood_emoji = st.radio("Choose your mood today:", ["😊 Happy", "😔 Sad", "😠 Angry", "😨 Anxious", "😐 Neutral"])
-    st.session_state.mood_score = st.slider("Rate your mood (1 = Worst, 10 = Best):", 1, 10, 5)
-
-# -------------------- Prompt Builder --------------------
-def build_prompt(user_input, emotion, sentiment, mood_emoji, mood_score):
-    techniques = [
-        "deep breathing", "journaling", "talking to a friend", "grounding technique", 
-        "5-4-3-2-1 sensory method", "positive affirmations", "taking a short walk", 
-        "gratitude listing", "progressive muscle relaxation"
-    ]
-    technique = random.choice(techniques)
-    
-    return f"""
-You're a compassionate AI mental health therapist.
-
-User feels {emotion.lower()} ({mood_emoji}) with a sentiment of {sentiment.lower()}, mood score {mood_score}/10.
-
-User says: "{user_input}"
-
-Give an empathetic reply and suggest a mental health tip like "{technique}" with a fact or reasoning.
-Keep it friendly and brief.
-"""
-
-# -------------------- Chat Interaction --------------------
-user_input = st.chat_input("What's on your mind?")
+user_input = st.text_input("💬 How are you feeling today?", key="input")
 
 if user_input:
-    st.session_state.chat_history.append(("user", user_input))
-
-    with st.spinner("🤖 Thinking..."):
+    with st.spinner("Analyzing your emotional tone..."):
         sentiment = sentiment_model(user_input)[0]["label"]
         emotion = emotion_model(user_input)[0]["label"]
-        prompt = build_prompt(user_input, emotion, sentiment, mood_emoji, st.session_state.mood_score)
-        response = motivator(prompt, max_length=150, num_return_sequences=1)[0]["generated_text"]
 
-    bot_reply = f"""
-🧠 **Emotional Insight**  
+        if st.session_state.mood_score is None:
+            st.markdown("### 🌡️ How would you rate your mood on a scale from 1️⃣ to 🔟?")
+            mood_score = st.slider("Mood Score", 1, 10, 5)
+            st.session_state.mood_score = mood_score
+
+        prompt = f"You are a compassionate AI therapist. A user says: '{user_input}'. They feel {emotion.lower()} and their sentiment is {sentiment.lower()}, with a mood score of {st.session_state.mood_score}/10. Provide an empathetic response and suggest a psychological technique like gratitude listing or breathing with a real scientific reason."
+        motivational_text = motivator(prompt, max_new_tokens=100)[0]["generated_text"]
+
+    st.session_state.chat_history.append(("user", user_input))
+    reply = f"""
+### 🧠 Emotional Insight
 You're feeling **{emotion.lower()}** and your sentiment is **{sentiment.lower()}**.
 
-💬 **My Suggestion**  
-{response.strip()}
-"""
+### 💬 My Suggestion
+{motivational_text.strip()}
+    """
+    st.session_state.chat_history.append(("bot", reply))
 
-    if st.session_state.mood_score <= 3:
-        bot_reply += "\n\n🌬️ *Try this breathing exercise to relax:*"
-        bot_reply += "\n![Breathing GIF](https://media.tenor.com/Xk4xzR9U69QAAAAC/breath-in-breath-out.gif)"
+st.markdown("---")
+st.subheader("💭 Your Conversation")
 
-    st.session_state.chat_history.append(("bot", bot_reply))
-
-# -------------------- Display Chat --------------------
 for sender, msg in reversed(st.session_state.chat_history):
     message(msg, is_user=(sender == "user"), key=f"{sender}_{hash(msg)}")
