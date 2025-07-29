@@ -1,1 +1,8 @@
+import pandas as pd
+from datetime import datetime
+
+def log_mood(mood, note=""):
+    now = datetime.now().isoformat()
+    df = pd.DataFrame([[now, mood, note]], columns=["datetime", "mood", "note"])
+    df.to_csv("data/mood_log.csv", mode="a", header=not os.path.exists("data/mood_log.csv"), index=False)
 
