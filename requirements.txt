@@ -6,3 +6,4 @@ matplotlib
 pandas
 streamlit-option-menu
 torch
+streamlit-lottie
