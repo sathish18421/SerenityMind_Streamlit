@@ -5,9 +5,8 @@ from uuid import uuid4
 import base64
 import re
 from textblob import TextBlob
-from datetime import datetime
 
-# --- App Configuration ---
+# Set up the page
 st.set_page_config(page_title="🧠 SerenityMind Chatbot", layout="centered")
 
 # --- Background Setup ---
@@ -25,31 +24,32 @@ def set_background(image_path):
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
-            color: #000;
-        }}
-        .stTextInput > div > input {{
-            background-color: #ffffffcc;
-            color: #000000;
         }}
         </style>
     """, unsafe_allow_html=True)
 
 set_background("assets/background.webp")
 
-# --- Token Setup ---
+# --- Hugging Face Token ---
 API_TOKEN = "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"
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
-# --- Text Cleaning ---
+# --- Preprocess ---
 def clean_text(text):
     text = text.strip()
     text = re.sub(r"\bi[ ]*am\b", "I am", text, flags=re.IGNORECASE)
     text = re.sub(r"im ", "I am ", text, flags=re.IGNORECASE)
-    text = text.replace("depressed", "very sad")
-    text = text.replace("in depression", "feeling deeply low")
     return text
 
-# --- Hugging Face API Query ---
+# --- Keyword Override for Sensitive Input ---
+CRITICAL_KEYWORDS = {
+    "lost my baby": ("grief", "very negative", 9.5),
+    "my baby died": ("grief", "very negative", 10),
+    "i lost someone": ("grief", "very negative", 9),
+    "death": ("grief", "very negative", 9),
+}
+
+# --- Hugging Face API ---
 def query_huggingface_api(prompt, url):
     try:
         res = requests.post(url, headers=headers, json={"inputs": prompt}, timeout=20)
@@ -57,7 +57,7 @@ def query_huggingface_api(prompt, url):
     except:
         return None
 
-# --- Endpoints ---
+# --- Model URLs ---
 ENDPOINTS = {
     "sentiment": "https://api-inference.huggingface.co/models/nlptown/bert-base-multilingual-uncased-sentiment",
     "emotion": "https://api-inference.huggingface.co/models/SamLowe/roberta-base-go_emotions",
@@ -65,22 +65,19 @@ ENDPOINTS = {
     "motivator": "https://api-inference.huggingface.co/models/OpenAssistant/oasst-sft-1-pythia-12b"
 }
 
-# --- Session Management ---
+# --- Session Storage ---
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-if "last_mood" not in st.session_state:
-    st.session_state.last_mood = ""
 
-# --- Chat Header ---
+# --- UI Header ---
 st.markdown("""
 <div style="display: flex; align-items: center; justify-content: space-between; background-color: #ffffffcc; padding: 0.8rem 1rem; border-radius: 1rem;">
     <div style="display: flex; align-items: center;">
         <span style="font-size: 2rem;">🤖</span>
         <h3 style="margin-left: 1rem;">SerenityBot <span style='font-size:0.8rem; color:green;'>(online)</span></h3>
     </div>
-    <div style="font-size:0.8rem; color:#666;">{}</div>
 </div>
-""".format(datetime.now().strftime("%A, %d %B %Y")), unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # --- User Input ---
 raw_input = st.text_input("How are you feeling today?")
@@ -88,29 +85,46 @@ user_input = clean_text(raw_input)
 
 if user_input:
     st.session_state.chat_history.append(("user", raw_input))
-    with st.spinner("🧠 Interpreting your feelings..."):
-        blob = TextBlob(user_input)
-        polarity = blob.sentiment.polarity
-        subjectivity = blob.sentiment.subjectivity
+    with st.spinner("Analyzing your mood..."):
 
-        sentiment_res = query_huggingface_api(user_input, ENDPOINTS["sentiment"])
-        emotion_res = query_huggingface_api(user_input, ENDPOINTS["emotion"])
-        intensity_res = query_huggingface_api(user_input, ENDPOINTS["intensity"])
+        # Override for known trauma expressions
+        for phrase, (emo, senti, intense) in CRITICAL_KEYWORDS.items():
+            if phrase in user_input.lower():
+                emotion_label, sentiment_label, scaled_intensity = emo, senti, intense
+                skip_api = True
+                break
+        else:
+            skip_api = False
 
-        sentiment_label = sentiment_res[0]["label"] if sentiment_res else ("positive" if polarity > 0 else "negative" if polarity < 0 else "neutral")
-        emotion_label = emotion_res[0]["label"] if emotion_res else ("confused" if polarity < -0.2 else "hopeful")
-        intensity_score = float(intensity_res[0]["score"]) if intensity_res else abs(polarity)
-        scaled_intensity = round(intensity_score * 10, 1)
+        # If no override, use APIs + TextBlob
+        if not skip_api:
+            blob = TextBlob(user_input)
+            polarity = blob.sentiment.polarity
+            subjectivity = blob.sentiment.subjectivity
 
-        st.session_state.last_mood = emotion_label
+            sentiment_res = query_huggingface_api(user_input, ENDPOINTS["sentiment"])
+            emotion_res = query_huggingface_api(user_input, ENDPOINTS["emotion"])
+            intensity_res = query_huggingface_api(user_input, ENDPOINTS["intensity"])
 
-        # Prompt
-        prompt = f"""
-        You are a highly empathetic and supportive AI therapist. The user feels {emotion_label}, sentiment is {sentiment_label}, intensity {scaled_intensity}/10. 
-        TextBlob polarity={polarity:.2f}, subjectivity={subjectivity:.2f}.
-        User said: '{user_input}'.
-        Reply with compassion, suggest a practical and evidence-backed mental health technique (e.g. gratitude journaling, box breathing, 54321 grounding). Then ask one gentle follow-up to continue conversation.
-        """
+            sentiment_label = sentiment_res[0]["label"] if sentiment_res else ("positive" if polarity > 0 else "negative" if polarity < 0 else "neutral")
+            emotion_label = emotion_res[0]["label"] if emotion_res else ("confused" if polarity < -0.2 else "hopeful")
+            intensity_score = float(intensity_res[0]["score"]) if intensity_res else abs(polarity)
+            scaled_intensity = round(intensity_score * 10, 1)
+
+        # Custom prompt for grief or regular prompt
+        if emotion_label == "grief":
+            prompt = f"""
+            You are a gentle AI therapist. A user has shared they are grieving deeply: '{user_input}'
+            Offer comfort first. Say it's okay to feel broken. Then suggest a gentle mental health tool (e.g. breathing, journaling).
+            Keep it warm and brief.
+            """
+        else:
+            prompt = f"""
+            You are a compassionate mental health chatbot. The user feels {emotion_label} and sentiment is {sentiment_label}, intensity is {scaled_intensity}/10.
+            Text: '{user_input}'
+            Give an empathetic reply and suggest a mental health activity like gratitude journaling, breathing or 54321 technique.
+            Be brief and kind.
+            """
 
         motivator_res = query_huggingface_api(prompt, ENDPOINTS["motivator"])
         generated = motivator_res[0]["generated_text"].strip() if motivator_res and isinstance(motivator_res, list) else "You're not alone. Let's take a few deep breaths together."
@@ -128,6 +142,6 @@ _"{generated}"_
 """
         st.session_state.chat_history.append(("bot", reply))
 
-# --- Chat Display ---
-for i, (sender, msg) in enumerate(reversed(st.session_state.chat_history)):
+# --- Display Chat Messages ---
+for sender, msg in reversed(st.session_state.chat_history):
     message(msg, is_user=(sender == "user"), key=f"{sender}_{uuid4()}")
