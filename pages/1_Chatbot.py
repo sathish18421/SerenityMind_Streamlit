@@ -97,6 +97,8 @@ _"{motivational[0]['generated_text']}"_
         st.session_state.chat_history.append(("bot", reply))
 
 # Chat UI
-for i, (sender, msg) in enumerate(reversed(st.session_state.chat_history)):
-    message(msg, is_user=(sender == "user"), key=f"{sender}_{i}")
+for idx, (sender, msg) in enumerate(st.session_state.chat_history):
+    message(msg, is_user=(sender == "user"), key=f"{sender}_{idx}")
 
+# Push chat to scroll bottom
+st.markdown("<div style='height: 80px;'></div>", unsafe_allow_html=True)
