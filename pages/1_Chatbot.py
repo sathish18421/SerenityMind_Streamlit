@@ -4,6 +4,7 @@ from streamlit_chat import message
 from uuid import uuid4
 import base64
 import re
+from textblob import TextBlob
 
 # Page config
 st.set_page_config(page_title="🧠 SerenityMind Chatbot", layout="centered")
@@ -35,9 +36,9 @@ headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
 # Preprocessing
 def clean_text(text):
-    text = text.strip().lower()
-    text = re.sub(r"\bi[ ]*am\b", "I am", text)
-    text = text.replace("im ", "I am ")
+    text = text.strip()
+    text = re.sub(r"\bi[ ]*am\b", "I am", text, flags=re.IGNORECASE)
+    text = re.sub(r"im ", "I am ", text, flags=re.IGNORECASE)
     text = text.replace("depressed", "very sad")
     text = text.replace("in depression", "feeling deeply low")
     return text
@@ -78,25 +79,28 @@ user_input = clean_text(raw_input)
 
 if user_input:
     st.session_state.chat_history.append(("user", raw_input))
-    with st.spinner("Analyzing..."):
-        # Sentiment
+    with st.spinner("Analyzing your mood..."):
+        # TextBlob sentiment
+        blob = TextBlob(user_input)
+        polarity = blob.sentiment.polarity
+        subjectivity = blob.sentiment.subjectivity
+
+        # Hugging Face Models
         sentiment_res = query_huggingface_api(user_input, ENDPOINTS["sentiment"])
-        sentiment_label = sentiment_res[0]["label"] if sentiment_res else "neutral"
-
-        # Emotion
         emotion_res = query_huggingface_api(user_input, ENDPOINTS["emotion"])
-        emotion_label = emotion_res[0]["label"] if emotion_res else "unidentified emotion"
-
-        # Intensity
         intensity_res = query_huggingface_api(user_input, ENDPOINTS["intensity"])
-        intensity_score = float(intensity_res[0]["score"]) if intensity_res else 0.5
+
+        sentiment_label = sentiment_res[0]["label"] if sentiment_res else ("positive" if polarity > 0 else "negative" if polarity < 0 else "neutral")
+        emotion_label = emotion_res[0]["label"] if emotion_res else ("confused" if polarity < -0.2 else "hopeful")
+        intensity_score = float(intensity_res[0]["score"]) if intensity_res else abs(polarity)
         scaled_intensity = round(intensity_score * 10, 1)
 
         # Prompt for motivation
         prompt = f"""
-        You are a caring AI therapist. The user is feeling {emotion_label} with sentiment {sentiment_label} at {scaled_intensity}/10 intensity. They said: '{user_input}'.
-        Respond with empathy. Then suggest a simple, research-backed mental health technique (e.g. gratitude, box breathing, 54321 method).
-        Be kind, short, and warm.
+        You are a compassionate AI therapist. The user feels {emotion_label}, sentiment is {sentiment_label}, intensity {scaled_intensity}/10. 
+        TextBlob analysis: polarity={polarity:.2f}, subjectivity={subjectivity:.2f}.
+        They said: '{user_input}'
+        Give a brief empathetic response and suggest a helpful mental wellness activity like gratitude journaling, deep breathing, or grounding.
         """
         motivator_res = query_huggingface_api(prompt, ENDPOINTS["motivator"])
         generated = motivator_res[0]["generated_text"].strip() if motivator_res and isinstance(motivator_res, list) else "You're not alone. Let's try a mindful breathing exercise together."
@@ -104,13 +108,13 @@ if user_input:
         reply = f"""
 **🧠 Emotional Insight**
 
-You're feeling **{emotion_label}**, sentiment is **{sentiment_label}**, and intensity is **{scaled_intensity}/10**.
+You're feeling **{emotion_label}**, sentiment is **{sentiment_label}**, intensity **{scaled_intensity}/10**.
 
 💬 **My Suggestion**
 
 _"{generated}"_
 
-🔎 *Tip:* Try **54321 grounding** – Name 5 things you see, 4 you feel, 3 you hear, 2 you smell, 1 you taste.
+🔎 *Tip:* Try **box breathing** – inhale 4s, hold 4s, exhale 4s, hold 4s.
 """
         st.session_state.chat_history.append(("bot", reply))
 
