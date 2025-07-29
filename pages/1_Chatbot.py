@@ -32,7 +32,7 @@ set_background("assets/background.webp")
 
 # ------------------ Google Gemini Setup ------------------
 genai.configure(api_key="AIzaSyDE64Dbqcf8nGRYqYvN7q8_eWml9bAdrfI")
-model = genai.GenerativeModel("gemini-pro")
+model = genai.GenerativeModel(model_name="models/gemini-pro")
 chat_session = model.start_chat()
 
 # ------------------ Preprocessing ------------------
