@@ -51,7 +51,7 @@ def query_huggingface_api(prompt, mode):
         "sentiment": "https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english",
         "emotion": "https://api-inference.huggingface.co/models/j-hartmann/emotion-english-distilroberta-base",
         "intensity": "https://api-inference.huggingface.co/models/finiteautomata/bertweet-base-emotion-intensity",
-        "motivator": "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct"
+        "motivator": "https://api-inference.huggingface.co/models/bigscience/bloom-560m"
     }
     url = endpoints.get(mode)
     if not url:
@@ -81,7 +81,7 @@ raw_input = st.text_input("How are you feeling today?")
 user_input = clean_text(raw_input)
 
 if user_input:
-    st.session_state.chat_history.append(("user", user_input))
+    st.session_state.chat_history.append(("user", raw_input))
 
     with st.spinner("Analyzing your mood..."):
         sentiment = query_huggingface_api(user_input, "sentiment")
@@ -98,7 +98,7 @@ if user_input:
         prompt = f"You are a compassionate AI mental health therapist. The user feels {mood.lower()} with an emotional intensity of {scaled_intensity}/10 and their sentiment is {senti.lower()}. User says: '{user_input}'. Respond with empathy, suggest a helpful mental health technique like box breathing, gratitude journaling, or grounding. Be friendly and brief."
         motivational = query_huggingface_api(prompt, "motivator")
 
-        response_text = motivational[0]['generated_text'].strip() if motivational and isinstance(motivational, list) else "Let's take a deep breath and move forward together."
+        response_text = motivational[0]['generated_text'].strip() if motivational and isinstance(motivational, list) else "You're not alone. Let’s take a mindful step together."
 
         reply = f"""
 **🧠 Emotional Insight**
@@ -109,7 +109,7 @@ You're feeling **{mood.lower()}** with an emotional intensity of **{scaled_inten
 
 _"{response_text}"_
 
-🔎 Try this tip: **Box breathing** – inhale 4s, hold 4s, exhale 4s, hold 4s. A quick calm-down technique backed by neuroscience!
+🔎 Try this tip: **Box breathing** – inhale 4s, hold 4s, exhale 4s, hold 4s. A calm-down method used by Navy SEALs and therapists alike!
 """
         st.session_state.chat_history.append(("bot", reply))
 
