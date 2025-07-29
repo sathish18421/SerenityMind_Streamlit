@@ -18,7 +18,6 @@ def clean_text(text):
     text = text.replace("low mood", "feeling down")
     return text
 
-
 # Custom background using base64 webp
 @st.cache_resource
 def get_base64_bg(file_path):
@@ -90,18 +89,20 @@ if user_input:
         st.write("Sentiment Raw:", sentiment)
         st.write("Emotion Raw:", emotion)
 
-        if (
-            sentiment and isinstance(sentiment, list) and len(sentiment) > 0 and "label" in sentiment[0]
-            and emotion and isinstance(emotion, list) and len(emotion) > 0 and "label" in emotion[0]
-        ):
-            mood = emotion[0].get("label", "neutral")
-            senti = sentiment[0].get("label", "neutral")
-            prompt = f"You are a compassionate AI mental health therapist. The user feels {mood.lower()} and their sentiment is {senti.lower()}. User says: '{user_input}'. Respond with empathy, suggest a helpful mental health technique like box breathing, gratitude journaling, or grounding. Be friendly and brief."
-            motivational = query_huggingface_api(prompt, "motivator")
+        # fallback if result is empty or bad
+        if not emotion or not isinstance(emotion, list) or "label" not in emotion[0]:
+            emotion = [{"label": "sadness"}]
+        if not sentiment or not isinstance(sentiment, list) or "label" not in sentiment[0]:
+            sentiment = [{"label": "negative"}]
 
-            response_text = motivational[0]['generated_text'].strip() if motivational and isinstance(motivational, list) else "Let's take a deep breath and move forward together."
+        mood = emotion[0].get("label", "neutral")
+        senti = sentiment[0].get("label", "neutral")
+        prompt = f"You are a compassionate AI mental health therapist. The user feels {mood.lower()} and their sentiment is {senti.lower()}. User says: '{user_input}'. Respond with empathy, suggest a helpful mental health technique like box breathing, gratitude journaling, or grounding. Be friendly and brief."
+        motivational = query_huggingface_api(prompt, "motivator")
 
-            reply = f"""
+        response_text = motivational[0]['generated_text'].strip() if motivational and isinstance(motivational, list) else "Let's take a deep breath and move forward together."
+
+        reply = f"""
 **🧠 Emotional Insight**
 
 You're feeling **{mood.lower()}** and your sentiment is **{senti.lower()}**.
@@ -112,9 +113,6 @@ _"{response_text}"_
 
 🔎 Try this tip: **Box breathing** – inhale 4s, hold 4s, exhale 4s, hold 4s. A quick calm-down technique backed by neuroscience!
 """
-        else:
-            reply = "Sorry, I couldn't understand your mood. Please try again."
-
         st.session_state.chat_history.append(("bot", reply))
 
 # Chat UI
