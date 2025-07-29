@@ -48,10 +48,10 @@ headers = {"Authorization": f"Bearer {API_TOKEN}"}
 @st.cache_data(show_spinner=False)
 def query_huggingface_api(prompt, mode):
     endpoints = {
-        "sentiment": "https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english",
-        "emotion": "https://api-inference.huggingface.co/models/j-hartmann/emotion-english-distilroberta-base",
+        "sentiment": "https://api-inference.huggingface.co/models/nlptown/bert-base-multilingual-uncased-sentiment",
+        "emotion": "https://api-inference.huggingface.co/models/SamLowe/roberta-base-go_emotions",
         "intensity": "https://api-inference.huggingface.co/models/finiteautomata/bertweet-base-emotion-intensity",
-        "motivator": "https://api-inference.huggingface.co/models/bigscience/bloom-560m"
+        "motivator": "https://api-inference.huggingface.co/models/OpenAssistant/oasst-sft-1-pythia-12b"
     }
     url = endpoints.get(mode)
     if not url:
@@ -88,9 +88,8 @@ if user_input:
         emotion = query_huggingface_api(user_input, "emotion")
         intensity = query_huggingface_api(user_input, "intensity")
 
-        # fallback if result is empty or bad
         mood = emotion[0]['label'] if emotion and isinstance(emotion, list) and 'label' in emotion[0] else "sadness"
-        senti = sentiment[0]['label'] if sentiment and isinstance(sentiment, list) and 'label' in sentiment[0] else "negative"
+        senti = sentiment[0]['label'] if sentiment and isinstance(sentiment, list) and 'label' in sentiment[0] else "neutral"
         intensity_score = intensity[0]['score'] if intensity and isinstance(intensity, list) and 'score' in intensity[0] else 0.5
 
         scaled_intensity = round(intensity_score * 10, 1)
