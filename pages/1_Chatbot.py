@@ -31,7 +31,7 @@ def set_background(image_path):
 set_background("assets/background.webp")
 
 # ------------------ Google Gemini Setup ------------------
-genai.configure(api_key="AIzaSyDE64Dbqcf8nGRYqYvN7q8_eWml9bAdrfI")
+genai.configure(api_key="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")
 model = genai.GenerativeModel(model_name="models/gemini-pro")
 chat_session = model.start_chat()
 
@@ -62,35 +62,66 @@ user_input = clean_text(raw_input)
 
 if user_input:
     st.session_state.chat_history.append(("user", raw_input))
-    with st.spinner("Analyzing your message and context..."):
+    with st.spinner("Analyzing your message and crafting a caring response..."):
         blob = TextBlob(user_input)
         polarity = blob.sentiment.polarity
         subjectivity = blob.sentiment.subjectivity
 
-        sentiment_label = "positive" if polarity > 0 else "negative" if polarity < 0 else "neutral"
-        emotion_label = "confused" if polarity < -0.2 else "hopeful"
+        # Determine sentiment label
+        if polarity > 0.2:
+            sentiment_label = "positive"
+            emotion_label = "hopeful"
+        elif polarity < -0.2:
+            sentiment_label = "negative"
+            emotion_label = "sad or confused"
+        else:
+            sentiment_label = "neutral"
+            emotion_label = "uncertain or calm"
+
         scaled_intensity = round(abs(polarity) * 10, 1)
 
+        # Compose detailed prompt for Gemini with empathy + science + advice
         context_prompt = f"""
-        The user feels {emotion_label}, sentiment is {sentiment_label}, intensity {scaled_intensity}/10.
-        TextBlob: polarity={polarity:.2f}, subjectivity={subjectivity:.2f}.
-        The user said: '{user_input}'
+The user expressed: "{user_input}"
 
-        Respond like a supportive therapist. Give an empathetic and motivational reply, and suggest a helpful action (e.g., deep breathing, journaling, reaching out to a friend).
-        """
+Sentiment analysis details:
+- Sentiment: {sentiment_label}
+- Emotion: {emotion_label}
+- Intensity (0-10): {scaled_intensity}
+- Polarity: {polarity:.2f}
+- Subjectivity: {subjectivity:.2f}
+
+Instructions:
+You are a compassionate therapist and science-backed coach. 
+Respond with empathy and emotional insight first, acknowledging the user's feelings.
+
+Then, provide motivational support highlighting positive scientific or psychological facts relevant to their situation.
+
+Finally, suggest practical coping mechanisms or wellness tips, such as journaling, mindfulness, breathing exercises, or reaching out to loved ones.
+
+Use a warm, calm, and encouraging tone. Format your response clearly with:
+
+🧠 Emotional Insight  
+💬 Supportive Message  
+🔬 Science Tip  
+🌱 Wellness Suggestion
+
+Do not repeat the user's input verbatim. Make the reply personal and hopeful.
+"""
+
         response = chat_session.send_message(context_prompt)
-        reply_text = response.text
+        reply_text = response.text.strip()
 
         reply = f"""
 **🧠 Emotional Insight**
 
-You're feeling **{emotion_label}**, sentiment is **{sentiment_label}**, intensity **{scaled_intensity}/10**.
+You're feeling **{emotion_label}** with a **{sentiment_label}** sentiment, intensity **{scaled_intensity}/10**.
 
-💬 **My Suggestion**
+💬 **Supportive Message**
 
-_"{reply_text.strip()}"_
+_{reply_text}_
 
-🔎 *Try a wellness tip: mindfulness, journaling, or 54321 grounding.*
+🔎 *Try wellness practices like mindfulness, journaling, or the 5-4-3-2-1 grounding technique.*
 """
         st.session_state.chat_history.append(("bot", reply))
 
